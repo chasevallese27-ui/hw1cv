@@ -1,259 +1,329 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>BMW M3 Viewer</title>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>CMW M3 Viewer</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #0a0a0f; overflow: hidden; font-family: sans-serif; }
-    canvas { display: block; }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { background:#07070f; overflow:hidden; font-family:'Segoe UI',system-ui,sans-serif; }
+    canvas { display:block; }
     #title {
-      position: absolute; top: 28px; left: 40px;
-      color: #fff; font-size: 1.8rem; font-weight: 700;
-      letter-spacing: 0.12em; text-transform: uppercase; pointer-events: none;
+      position:absolute; top:30px; left:44px; pointer-events:none;
+      color:#fff; font-size:1.75rem; font-weight:700;
+      letter-spacing:.12em; text-transform:uppercase;
     }
-    #title span { color: #1a7fff; }
+    #title span { color:#1a7fff; }
+    #sub {
+      position:absolute; top:74px; left:45px; pointer-events:none;
+      color:#1a7fff; font-size:.6rem; letter-spacing:.34em; text-transform:uppercase;
+    }
+    #accent {
+      position:absolute; top:28px; left:40px; width:3px; height:70px;
+      background:linear-gradient(to bottom,#1a7fff,transparent);
+      border-radius:2px; pointer-events:none;
+    }
     #hint {
-      position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);
-      color: #555; font-size: 0.68rem; letter-spacing: 0.22em;
-      text-transform: uppercase; pointer-events: none;
+      position:absolute; bottom:26px; left:50%; transform:translateX(-50%);
+      color:#333; font-size:.64rem; letter-spacing:.22em;
+      text-transform:uppercase; pointer-events:none; white-space:nowrap;
     }
   </style>
 </head>
 <body>
-  <div id="title">BMW <span>M3</span> Viewer</div>
-  <div id="hint">Drag to rotate &nbsp;·&nbsp; Scroll to zoom</div>
+  <div id="accent"></div>
+  <div id="title">CMW <span>M3</span></div>
+  <div id="sub">Competition · 3D Viewer</div>
+  <div id="hint">Drag to rotate &nbsp;·&nbsp; Scroll to zoom &nbsp;·&nbsp; Right-drag to pan</div>
 
   <script type="importmap">
-  {
-    "imports": {
-      "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+  { "imports": {
+      "three":         "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
       "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
-    }
-  }
+  }}
   </script>
 
   <script type="module">
-    import * as THREE from 'three';
-    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+  import * as THREE             from 'three';
+  import { OrbitControls }      from 'three/addons/controls/OrbitControls.js';
+  import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 
-    /* ─── Renderer ─── */
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  /* ── RENDERER ──────────────────────────────────────── */
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type    = THREE.PCFSoftShadowMap;
+  document.body.appendChild(renderer.domElement);
+
+  /* ── SCENE ─────────────────────────────────────────── */
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x07070f);
+  scene.fog = new THREE.Fog(0x07070f, 22, 48);
+
+  /* ── CAMERA ────────────────────────────────────────── */
+  const camera = new THREE.PerspectiveCamera(44, innerWidth / innerHeight, 0.1, 120);
+  camera.position.set(6, 2.6, 6);
+
+  /* ── CONTROLS ──────────────────────────────────────── */
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.07;
+  controls.minDistance   = 2.8;
+  controls.maxDistance   = 15;
+  controls.maxPolarAngle = Math.PI / 2.05;
+  controls.target.set(0, 0.5, 0);
+  controls.update();
+
+  /* ── LIGHTS  (Phong only needs direct lights — no env map) ── */
+  // Strong ambient so no face is ever pitch-black
+  scene.add(new THREE.AmbientLight(0xffffff, 1.0));
+
+  // Warm key light, upper-front-right, casts shadows
+  const key = new THREE.DirectionalLight(0xffeedd, 3.0);
+  key.position.set(6, 10, 5);
+  key.castShadow = true;
+  key.shadow.mapSize.set(2048, 2048);
+  key.shadow.camera.left = key.shadow.camera.bottom = -8;
+  key.shadow.camera.right = key.shadow.camera.top   =  8;
+  key.shadow.camera.near = 1; key.shadow.camera.far = 32;
+  key.shadow.bias = -0.001;
+  scene.add(key);
+
+  // Cool blue fill from left
+  const fill = new THREE.DirectionalLight(0x4488ff, 2.0);
+  fill.position.set(-8, 4, 2);
+  scene.add(fill);
+
+  // Hard rim backlight — creates the blue silhouette edge
+  const rim = new THREE.DirectionalLight(0x2244cc, 2.4);
+  rim.position.set(-1, 5, -10);
+  scene.add(rim);
+
+  // Soft overhead white
+  const over = new THREE.DirectionalLight(0xffffff, 1.2);
+  over.position.set(0, 10, 0);
+  scene.add(over);
+
+  // Under-car coloured glow (pulsed)
+  const glow = new THREE.PointLight(0x0055ff, 5, 7);
+  glow.position.set(0, 0.08, 0);
+  scene.add(glow);
+
+  /* ── FLOOR + GRID + RING ───────────────────────────── */
+  const floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(70, 70),
+    new THREE.MeshPhongMaterial({ color: 0x080818, shininess: 20 })
+  );
+  floor.rotation.x = -Math.PI / 2;
+  floor.receiveShadow = true;
+  scene.add(floor);
+
+  const grid = new THREE.GridHelper(70, 70, 0x0d0d28, 0x0d0d28);
+  grid.position.y = 0.002;
+  scene.add(grid);
+
+  const ringMat = new THREE.MeshBasicMaterial(
+    { color: 0x0055ff, side: THREE.DoubleSide, transparent: true, opacity: 0.28 });
+  const ring = new THREE.Mesh(new THREE.RingGeometry(2.8, 3.05, 80), ringMat);
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y  = 0.003;
+  scene.add(ring);
+
+  /* ── MATERIALS  (all MeshPhongMaterial — visible with direct lights only) ── */
+  const MAT = {
+    // Bright metallic blue body paint
+    paint  : new THREE.MeshPhongMaterial({ color: 0x1a4fbd, specular: 0x88aaff, shininess: 160 }),
+    // Darker blue for hood dome, diffuser accents
+    paint2 : new THREE.MeshPhongMaterial({ color: 0x103080, specular: 0x6688cc, shininess: 140 }),
+    // Dark tinted glass (semi-transparent)
+    glass  : new THREE.MeshPhongMaterial({ color: 0x0d1a2e, specular: 0x4466aa, shininess: 220,
+                                           transparent: true, opacity: 0.72 }),
+    // Matte black trim — sills, diffuser, grille surrounds
+    matte  : new THREE.MeshPhongMaterial({ color: 0x111122, shininess: 18 }),
+    // Tyre rubber
+    rubber : new THREE.MeshPhongMaterial({ color: 0x141414, shininess: 4 }),
+    // Polished alloy wheel
+    alloy  : new THREE.MeshPhongMaterial({ color: 0xccccdd, specular: 0xffffff, shininess: 240 }),
+    // Mirror chrome
+    chrome : new THREE.MeshPhongMaterial({ color: 0xddddf0, specular: 0xffffff, shininess: 360 }),
+    // Headlight lens (emissive blue-white)
+    hlight : new THREE.MeshPhongMaterial({ color: 0xd0eaff, emissive: 0x2244cc,
+                                           emissiveIntensity: 1.0, shininess: 200 }),
+    // DRL bright strip
+    drl    : new THREE.MeshPhongMaterial({ color: 0xffffff, emissive: 0x7799ff,
+                                           emissiveIntensity: 1.2, shininess: 120 }),
+    // Tail light red
+    tail   : new THREE.MeshPhongMaterial({ color: 0xff1111, emissive: 0xff0000,
+                                           emissiveIntensity: 1.4, shininess: 160 }),
+    // Brake disc
+    disc   : new THREE.MeshPhongMaterial({ color: 0x252525, shininess: 60 }),
+  };
+
+  /* ── HELPERS ───────────────────────────────────────── */
+  // All geometry is added to this group, which is added to scene once at the end
+  const car = new THREE.Group();
+  const HP  = Math.PI / 2;
+
+  function rb(w, h, d, bev, mat, x, y, z, rx=0, ry=0, rz=0) {
+    const geo = bev > 0 ? new RoundedBoxGeometry(w, h, d, 3, bev)
+                        : new THREE.BoxGeometry(w, h, d);
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(x, y, z);
+    m.rotation.set(rx, ry, rz);
+    m.castShadow = true;
+    m.receiveShadow = true;
+    car.add(m);
+    return m;
+  }
+
+  // Mirror a piece to both ±Z sides
+  function rb2(w, h, d, bev, mat, x, y, az, rx=0, ry=0, rz=0) {
+    rb(w, h, d, bev, mat, x, y,  az, rx, ry, rz);
+    rb(w, h, d, bev, mat, x, y, -az, rx, ry, rz);
+  }
+
+  function cy(rT, rB, h, seg, mat, x, y, z, rx=0, ry=0, rz=0) {
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(rT, rB, h, seg), mat);
+    m.position.set(x, y, z);
+    m.rotation.set(rx, ry, rz);
+    m.castShadow = true;
+    m.receiveShadow = true;
+    car.add(m);
+    return m;
+  }
+
+  /* ═══════════════════════════════════════════════════
+     CAR GEOMETRY
+     Axes: +X = nose  |  +Z = right  |  +Y = up
+     Wheel radius WR = 0.36 → WY = 0.36 (tyre flush with floor at Y=0)
+     Body slab centre Y = 0.43, bottom ≈ 0.21 (low clearance)
+     Roof top ≈ Y = 1.27 (low coupe profile)
+  ═══════════════════════════════════════════════════ */
+
+  /* ── LOWER BODY ─────────────────────────────────── */
+  rb( 5.05, 0.055, 1.84, 0.02, MAT.matte,  0,     0.18,  0);           // undertray
+  rb( 4.92, 0.46,  1.92, 0.08, MAT.paint,  0,     0.43,  0);           // main slab
+  rb( 4.62, 0.11,  2.12, 0.03, MAT.matte,  0,     0.10,  0);           // side sills
+
+  /* ── HOOD ───────────────────────────────────────── */
+  rb( 1.95, 0.09,  1.88, 0.04, MAT.paint,  1.20,  0.685, 0, 0,0,-0.046); // hood panel
+  rb2(1.65, 0.052, 0.17, 0.02, MAT.paint2, 1.12,  0.742, 0.29);           // power domes
+
+  /* ── TRUNK LID ──────────────────────────────────── */
+  rb( 1.04, 0.08,  1.88, 0.04, MAT.paint, -1.51,  0.663, 0, 0,0, 0.062);
+
+  /* ── FRONT BUMPER ───────────────────────────────── */
+  rb( 0.30, 0.41,  1.94, 0.05, MAT.paint,  2.53,  0.32,  0);           // fascia
+  rb( 0.44, 0.065, 1.92, 0.02, MAT.matte,  2.58,  0.09,  0);           // splitter
+  rb2(0.26, 0.09,  0.055,0.01, MAT.matte,  2.44,  0.09,  0.80);        // canards
+
+  /* ── REAR BUMPER & DIFFUSER ─────────────────────── */
+  rb( 0.30, 0.38,  1.94, 0.05, MAT.paint, -2.53,  0.30,  0);           // fascia
+  rb( 0.44, 0.16,  1.82, 0.02, MAT.matte, -2.58,  0.12,  0);           // diffuser
+  for (let z = -0.54; z <= 0.55; z += 0.22)                             // diffuser fins
+    rb(0.42, 0.14, 0.025, 0, MAT.chrome, -2.57, 0.11, z);
+
+  /* ── CABIN / GLASSHOUSE ─────────────────────────────────────────────
+     Three glass panes give the fastback coupe silhouette:
+       steep windshield → flat roof → gently sloped rear fastback screen
+     Each glass pane has a body-colour shell sitting just behind it so
+     the car looks solid and fully enclosed (not a convertible).         */
+
+  // — Windshield 62° rake —
+  rb( 0.74, 0.54, 1.70, 0.04, MAT.glass,  0.935, 0.875, 0, 0,0,-0.635);
+  rb( 0.70, 0.52, 1.92, 0.03, MAT.paint,  0.935, 0.875, 0, 0,0,-0.635); // shell
+
+  // — Flat roof panel —
+  rb( 2.12, 0.42, 1.72, 0.07, MAT.glass, -0.07,  1.05,  0);
+  rb( 2.00, 0.42, 1.92, 0.05, MAT.paint, -0.07,  1.05,  0);             // shell
+
+  // — Rear fastback screen 48° slope —
+  rb( 0.94, 0.56, 1.70, 0.04, MAT.glass, -1.09,  0.875, 0, 0,0, 0.50);
+  rb( 0.90, 0.54, 1.92, 0.03, MAT.paint, -1.09,  0.875, 0, 0,0, 0.50); // shell
+
+  /* ── PILLARS ────────────────────────────────────── */
+  rb2(0.07, 0.50, 0.08, 0.01, MAT.matte,  0.84,  0.96,  0.88, 0,0,-0.53); // A
+  rb2(0.09, 0.52, 0.09, 0.01, MAT.matte, -1.04,  0.96,  0.88, 0,0, 0.49); // C
+  rb2(0.06, 0.90, 0.07, 0.01, MAT.matte,  0.02,  1.05,  0.90);            // roof rail
+
+  /* ── REAR SPOILER ───────────────────────────────── */
+  rb( 0.09, 0.22, 1.65, 0.03, MAT.paint2,-1.96,  0.94,  0);             // blade
+  rb2(0.09, 0.22, 0.06, 0.02, MAT.paint2,-1.96,  0.94,  0.85);          // end plates
+  rb2(0.05, 0.15, 0.05, 0.01, MAT.matte, -1.96,  0.80,  0.56);          // stems
+
+  /* ── FRONT FACE ─────────────────────────────────── */
+  rb2(0.18, 0.11, 0.42, 0.03, MAT.hlight, 2.56,  0.675, 0.615);         // headlights
+  rb( 0.06, 0.038,0.68, 0.01, MAT.drl,    2.58,  0.785, 0);             // DRL strip
+  rb2(0.10, 0.42, 0.265,0.05, MAT.chrome, 2.55,  0.43,  0.215);         // kidney grilles
+  rb( 0.08, 0.46, 0.66, 0.04, MAT.matte,  2.53,  0.43,  0);             // grille surround
+  rb( 0.07, 0.40, 0.62, 0.02, MAT.matte,  2.57,  0.43,  0);             // grille backing
+  rb2(0.10, 0.13, 0.40, 0.02, MAT.matte,  2.58,  0.22,  0.58);          // lower intakes ×2
+  rb( 0.10, 0.13, 0.30, 0.02, MAT.matte,  2.58,  0.22,  0);             // lower intake centre
+  rb2(0.09, 0.07, 0.40, 0.02, MAT.hlight, 2.52,  0.10,  0.67);          // fog accents
+
+  /* ── REAR FACE ──────────────────────────────────── */
+  rb2(0.16, 0.11, 0.52, 0.03, MAT.tail,  -2.56,  0.675, 0.575);         // tail lights
+  rb( 0.06, 0.05, 0.65, 0.01, MAT.tail,  -2.58,  0.775, 0);             // light bar
+  rb( 0.10, 0.14, 0.52, 0.02, MAT.matte, -2.58,  0.48,  0);             // plate recess
+  cy(0.068,0.068,0.22,16,MAT.chrome, -2.58,0.21, 0.50, 0,HP,0);         // exhausts ×4
+  cy(0.068,0.068,0.22,16,MAT.chrome, -2.58,0.21, 0.34, 0,HP,0);
+  cy(0.068,0.068,0.22,16,MAT.chrome, -2.58,0.21,-0.34, 0,HP,0);
+  cy(0.068,0.068,0.22,16,MAT.chrome, -2.58,0.21,-0.50, 0,HP,0);
+
+  /* ── SIDE DETAILS ───────────────────────────────── */
+  rb2(0.28,0.055,0.055,0.02,MAT.chrome,  0.26, 0.80, 0.98);             // front door handle
+  rb2(0.26,0.055,0.055,0.02,MAT.chrome, -0.50, 0.80, 0.98);             // rear door handle
+  rb2(0.20,0.10, 0.10, 0.02,MAT.matte,   1.50, 0.89, 0.99);             // mirror housing
+  rb2(0.07,0.09, 0.13, 0.01,MAT.matte,   1.42, 0.89, 0.99);             // mirror arm
+  rb2(0.42,0.055,0.04, 0.01,MAT.matte,   1.80, 0.65, 0.98);             // fender vent 1
+  rb2(0.42,0.055,0.04, 0.01,MAT.matte,   1.80, 0.61, 0.98);             // fender vent 2
+
+  /* ── WHEELS ─────────────────────────────────────────────────────────
+     Rotate rx = π/2 so the flat tyre face points outward along Z.
+     WY = 0.36 = tyre radius → bottom of tyre sits on Y=0 floor.        */
+  const WY   = 0.36;
+  const AXLE = [
+    [ 1.32,  1.06],   // front-right
+    [ 1.32, -1.06],   // front-left
+    [-1.38,  1.06],   // rear-right
+    [-1.38, -1.06],   // rear-left
+  ];
+
+  AXLE.forEach(([wx, wz]) => {
+    const side = wz > 0 ? 1 : -1;
+    cy(0.36,0.36,0.24,40, MAT.rubber, wx,WY,wz, HP,0,0);  // tyre
+    cy(0.28,0.28,0.26,10, MAT.alloy,  wx,WY,wz, HP,0,0);  // 10-spoke rim
+    cy(0.19,0.19,0.055,8, MAT.disc,   wx,WY,wz, HP,0,0);  // brake disc
+    cy(0.08,0.08,0.27,10, MAT.chrome, wx,WY,wz, HP,0,0);  // centre cap
+    cy(0.355,0.355,0.022,40,MAT.alloy, wx,WY,wz+(side*0.11),HP,0,0); // bead ring
+  });
+
+  // Wide-body wheel arch flares
+  AXLE.forEach(([wx, wz]) => {
+    rb(0.92, 0.09, 0.09, 0.03, MAT.paint, wx, 0.76, wz > 0 ? 1.02 : -1.02);
+  });
+
+  /* ── ADD CAR TO SCENE ───────────────────────────── */
+  scene.add(car);
+
+  /* ── RESIZE ─────────────────────────────────────── */
+  window.addEventListener('resize', () => {
+    camera.aspect = innerWidth / innerHeight;
+    camera.updateProjectionMatrix();
     renderer.setSize(innerWidth, innerHeight);
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    document.body.appendChild(renderer.domElement);
+  });
 
-    /* ─── Scene ─── */
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0a0a0f);
-    scene.fog = new THREE.FogExp2(0x0a0a0f, 0.035);
-
-    /* ─── Camera ─── */
-    const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 200);
-    camera.position.set(7, 3.5, 7);
-
-    /* ─── Controls ─── */
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.08;
-    controls.minDistance = 4;
-    controls.maxDistance = 20;
-    controls.maxPolarAngle = Math.PI / 2.05;
-    controls.target.set(0, 0.6, 0);
+  /* ── ANIMATION LOOP ─────────────────────────────── */
+  let t = 0;
+  (function tick() {
+    requestAnimationFrame(tick);
+    t += 0.016;
+    glow.intensity  = 4.5 + Math.sin(t * 1.4) * 1.0;
+    ringMat.opacity = 0.18 + Math.sin(t * 1.1) * 0.09;
     controls.update();
-
-    /* ─── Lights ─── */
-    // Bright ambient so nothing is ever pitch black
-    scene.add(new THREE.AmbientLight(0xffffff, 1.2));
-
-    // Key light — top front right (warm white)
-    const key = new THREE.DirectionalLight(0xffeedd, 3.0);
-    key.position.set(5, 8, 6);
-    key.castShadow = true;
-    key.shadow.mapSize.set(1024, 1024);
-    key.shadow.camera.near = 1;
-    key.shadow.camera.far = 30;
-    key.shadow.camera.left = key.shadow.camera.bottom = -8;
-    key.shadow.camera.right = key.shadow.camera.top = 8;
-    scene.add(key);
-
-    // Fill light — left side (cool blue)
-    const fill = new THREE.DirectionalLight(0x4488ff, 1.8);
-    fill.position.set(-6, 4, 3);
-    scene.add(fill);
-
-    // Rim / backlight — behind the car (blue)
-    const rim = new THREE.DirectionalLight(0x2255cc, 2.0);
-    rim.position.set(-2, 3, -8);
-    scene.add(rim);
-
-    // Under-glow point light
-    const glow = new THREE.PointLight(0x0055ff, 4, 8);
-    glow.position.set(0, 0.1, 0);
-    scene.add(glow);
-
-    // Soft top fill so roof is lit
-    const top = new THREE.DirectionalLight(0xffffff, 1.0);
-    top.position.set(0, 10, 0);
-    scene.add(top);
-
-    /* ─── Floor ─── */
-    const floor = new THREE.Mesh(
-      new THREE.PlaneGeometry(50, 50),
-      new THREE.MeshPhongMaterial({ color: 0x0e0e1c, shininess: 30 })
-    );
-    floor.rotation.x = -Math.PI / 2;
-    floor.receiveShadow = true;
-    scene.add(floor);
-
-    const grid = new THREE.GridHelper(50, 50, 0x111133, 0x111133);
-    grid.position.y = 0.002;
-    scene.add(grid);
-
-    // Glow ring under the car
-    const ringMat = new THREE.MeshBasicMaterial({
-      color: 0x0055ff, side: THREE.DoubleSide, transparent: true, opacity: 0.35
-    });
-    const ring = new THREE.Mesh(new THREE.RingGeometry(2.7, 3.0, 64), ringMat);
-    ring.rotation.x = -Math.PI / 2;
-    ring.position.y = 0.003;
-    scene.add(ring);
-
-    /* ─── Materials — MeshPhongMaterial works with direct lights, no envmap needed ─── */
-    const MAT = {
-      body:   new THREE.MeshPhongMaterial({ color: 0x1c4e8a, specular: 0x88aaff, shininess: 120 }),
-      cabin:  new THREE.MeshPhongMaterial({ color: 0x112244, specular: 0x4477cc, shininess: 200, transparent: true, opacity: 0.82 }),
-      wheel:  new THREE.MeshPhongMaterial({ color: 0x222222, shininess: 20 }),
-      rim:    new THREE.MeshPhongMaterial({ color: 0xccccdd, specular: 0xffffff, shininess: 250 }),
-      hubcap: new THREE.MeshPhongMaterial({ color: 0x444455, shininess: 60 }),
-      hlight: new THREE.MeshPhongMaterial({ color: 0xddeeff, emissive: 0x6699ff, emissiveIntensity: 1, shininess: 200 }),
-      tail:   new THREE.MeshPhongMaterial({ color: 0xff2222, emissive: 0xff0000, emissiveIntensity: 1.5, shininess: 180 }),
-      dark:   new THREE.MeshPhongMaterial({ color: 0x1a1a2a, shininess: 40 }),
-      chrome: new THREE.MeshPhongMaterial({ color: 0xddddee, specular: 0xffffff, shininess: 300 }),
-      rubber: new THREE.MeshPhongMaterial({ color: 0x181818, shininess: 5 }),
-    };
-
-    /* ─── Helper to add a box mesh to the car group ─── */
-    const car = new THREE.Group();
-    scene.add(car);
-
-    function addBox(w, h, d, mat, x, y, z, rx = 0, ry = 0, rz = 0) {
-      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
-      m.position.set(x, y, z);
-      m.rotation.set(rx, ry, rz);
-      m.castShadow = true;
-      m.receiveShadow = true;
-      car.add(m);
-      return m;
-    }
-
-    function addCyl(rTop, rBot, h, segs, mat, x, y, z, rx = 0, ry = 0, rz = 0) {
-      const m = new THREE.Mesh(new THREE.CylinderGeometry(rTop, rBot, h, segs), mat);
-      m.position.set(x, y, z);
-      m.rotation.set(rx, ry, rz);
-      m.castShadow = true;
-      m.receiveShadow = true;
-      car.add(m);
-      return m;
-    }
-
-    /* ─────────────────────────── CAR BODY ─────────────────────────── */
-    // Main lower body slab
-    addBox(4.4, 0.60, 1.95, MAT.body,  0,    0.56,  0);
-    // Side skirts (slightly wider & lower)
-    addBox(4.0, 0.20, 2.10, MAT.dark,  0,    0.20,  0);
-
-    // Hood (slopes gently upward toward windshield)
-    addBox(1.40, 0.10, 1.90, MAT.body,  1.30, 0.90,  0, 0, 0, -0.08);
-    // Trunk lid
-    addBox(1.10, 0.10, 1.90, MAT.body, -1.40, 0.88,  0, 0, 0,  0.06);
-
-    // Front bumper block
-    addBox(0.30, 0.46, 1.95, MAT.dark,  2.20, 0.46,  0);
-    // Rear bumper block
-    addBox(0.30, 0.46, 1.95, MAT.dark, -2.20, 0.46,  0);
-    // Rear diffuser fin
-    addBox(0.22, 0.14, 1.80, MAT.dark, -2.25, 0.20,  0);
-
-    /* ─── Cabin / glasshouse ─── */
-    // Main roof panel
-    addBox(2.10, 0.50, 1.75, MAT.cabin, 0.00, 1.10,  0);
-    // Windscreen (angled forward)
-    addBox(0.65, 0.52, 1.70, MAT.cabin, 0.98, 0.95,  0, 0, 0, -0.52);
-    // Rear screen (angled back)
-    addBox(0.60, 0.48, 1.70, MAT.cabin,-0.98, 0.95,  0, 0, 0,  0.52);
-    // Roof spoiler lip
-    addBox(0.10, 0.20, 1.65, MAT.dark, -1.08, 1.36,  0);
-    // A-pillars
-    addBox(0.08, 0.55, 0.10, MAT.dark,  0.88, 1.02,  0.86, 0, 0, -0.42);
-    addBox(0.08, 0.55, 0.10, MAT.dark,  0.88, 1.02, -0.86, 0, 0, -0.42);
-
-    /* ─── Front face details ─── */
-    // Headlights (emissive)
-    addBox(0.16, 0.14, 0.30, MAT.hlight,  2.25, 0.74,  0.52);
-    addBox(0.16, 0.14, 0.30, MAT.hlight,  2.25, 0.74, -0.52);
-    // BMW kidney grilles (two upright bars)
-    addBox(0.08, 0.28, 0.26, MAT.chrome,  2.25, 0.50,  0.22);
-    addBox(0.08, 0.28, 0.26, MAT.chrome,  2.25, 0.50, -0.22);
-    // Grille outline
-    addBox(0.06, 0.32, 0.62, MAT.dark,    2.24, 0.50,  0.00);
-    // Front fog light accents
-    addBox(0.08, 0.08, 0.40, MAT.hlight,  2.22, 0.25,  0.55);
-    addBox(0.08, 0.08, 0.40, MAT.hlight,  2.22, 0.25, -0.55);
-
-    /* ─── Rear face details ─── */
-    const HALF_PI = Math.PI / 2;
-    // Tail lights (emissive red)
-    addBox(0.14, 0.12, 0.36, MAT.tail,   -2.24, 0.74,  0.52);
-    addBox(0.14, 0.12, 0.36, MAT.tail,   -2.24, 0.74, -0.52);
-    // Exhaust pipes — rotate on Y so they point front-to-back
-    addCyl(0.075, 0.075, 0.20, 14, MAT.chrome, -2.28, 0.24,  0.38, 0, HALF_PI, 0);
-    addCyl(0.075, 0.075, 0.20, 14, MAT.chrome, -2.28, 0.24, -0.38, 0, HALF_PI, 0);
-
-    /* ─── Wheels (4×) ─── */
-    const WHEEL_POSITIONS = [
-      [ 1.30,  1.10],   // front right
-      [ 1.30, -1.10],   // front left
-      [-1.30,  1.10],   // rear right
-      [-1.30, -1.10],   // rear left
-    ];
-    const WY = 0.40; // wheel center height
-
-    WHEEL_POSITIONS.forEach(([wx, wz]) => {
-      // Tyre — rotate on X so the cylinder axis points along Z (side-facing)
-      addCyl(0.40, 0.40, 0.32, 32, MAT.rubber, wx, WY, wz, HALF_PI, 0, 0);
-      // Outer rim face
-      addCyl(0.30, 0.30, 0.34, 10, MAT.rim,    wx, WY, wz, HALF_PI, 0, 0);
-      // Centre cap
-      addCyl(0.10, 0.10, 0.35, 10, MAT.hubcap, wx, WY, wz, HALF_PI, 0, 0);
-      // Brake disc hint
-      addCyl(0.22, 0.22, 0.06,  8, MAT.dark,   wx, WY, wz, HALF_PI, 0, 0);
-    });
-
-    /* ─── Wheel arch flares ─── */
-    WHEEL_POSITIONS.forEach(([wx, wz]) => {
-      addBox(0.80, 0.12, 0.10, MAT.body, wx, 0.82, wz > 0 ? 1.02 : -1.02);
-    });
-
-    /* ─── Resize handler ─── */
-    window.addEventListener('resize', () => {
-      camera.aspect = innerWidth / innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(innerWidth, innerHeight);
-    });
-
-    /* ─── Animation loop ─── */
-    let t = 0;
-    (function tick() {
-      requestAnimationFrame(tick);
-      t += 0.016;
-      glow.intensity = 3.5 + Math.sin(t * 1.6) * 0.8;
-      ringMat.opacity = 0.25 + Math.sin(t * 1.3) * 0.12;
-      controls.update();
-      renderer.render(scene, camera);
-    })();
+    renderer.render(scene, camera);
+  })();
   </script>
 </body>
 </html>
