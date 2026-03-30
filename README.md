@@ -16,4 +16,4 @@ This repository contains my HW1 submission — an interactive 3D CMW M3 viewer b
 - Improve car design and rebrand to CMW M3
 
 ## Video Walkthrough
-[link coming soon]
+https://youtu.be/JdakYTHa1ZE
